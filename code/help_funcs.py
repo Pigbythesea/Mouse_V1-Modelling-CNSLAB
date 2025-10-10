@@ -3,6 +3,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import scipy.stats
+from scipy.optimize import curve_fit
+
+def naka_rushton_diff(x, m, Ce, ne, ke, Ci, ni, ki):
+    # center NR minus surround NR
+    return m + Ce * (x**ne)/(x**ne + ke**ne) - Ci * (x**ni)/(x**ni + ki**ni)
+
+def fit_naka_rushton_diff(x, y, sigma=None, p0=None, bounds=None):
+    # sensible defaults for widths in mm (0.10–0.30)
+    if p0 is None:
+        y = np.asarray(y, float)
+        m0  = float(y.min())
+        Ce0 = float(y.max() - y.min())
+        Ci0 = 0.5 * Ce0
+        p0  = [m0, Ce0, 2.0, 0.15, Ci0, 2.0, 0.25]
+    if bounds is None:
+        # m,   Ce,  ne,   ke,    Ci,  ni,   ki
+        lower = [0.0, 0.0, 0.5, 0.05, 0.0, 0.5, 0.10]
+        upper = [30., 50., 10., 0.30, 50., 10., 0.50]
+        bounds = (lower, upper)
+    params, cov = curve_fit(naka_rushton_diff, x, y, sigma=sigma, p0=p0, bounds=bounds, maxfev=1_000_000)
+    return params, cov
+
+# --- add to help_funcs.py ---
+def inside_vertical_strip_periodic(x, x_center=0.5, width_mm=0.20, L=1.0):
+    """
+    x, x_center in [0, L]; width_mm in mm on the same [0, L] torus.
+    Returns True if x lies within a vertical strip of width 'width_mm'
+    centered at x_center, with periodic wrap.
+    """
+    # minimal periodic distance along x on a 1D torus of length L
+    dx = abs(((x - x_center + L/2) % L) - L/2)
+    return dx <= (width_mm / 2.0)
+
+
 
 contrast_values = [0.02, 0.5, 1.0]
 target_spontaneous_rates = [2.2, 4, 3]
@@ -374,7 +408,7 @@ import scipy.stats
 #     else:
 #         return [ctrl_mean, chr2_mean, ctrl_err, chr2_err]
     
-def getStimRateMeans_v2(exc_spikes, exc_positions, rates=False, nrepeats = 6, skip= 0, simtime=800, delay=200, binlen = 200, radius = 0.25, pop=False):
+def getStimRateMeans_v2(exc_spikes, exc_positions, rates=False, nrepeats = 6, skip= 0, simtime=800, delay=200, binlen = 200, radius = 0.35, pop=False):
     # store the control times and the chr2 stimulation times
     control_times = []
     chr_times = []
